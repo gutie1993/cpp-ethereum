@@ -472,8 +472,35 @@ public:
 	private:
 		mutable bytes m_key;
 	};
+
 	iterator begin() const { return iterator(); }
 	iterator end() const { return iterator(); }
+
+	// Iterating over pairs <hashedKey, pair<key, value>>
+	class HashedIterator : public GenericTrieDB<_DB>::iterator
+	{
+	public:
+		using Super = typename GenericTrieDB<_DB>::iterator;
+		using value_type = std::pair<const h256, typename Super::value_type>;
+
+		HashedIterator() { }
+		HashedIterator(FatGenericTrieDB const* _trie) : Super(_trie) { }
+
+		value_type at() const
+		{
+			auto hashed = Super::at();
+			m_key = static_cast<FatGenericTrieDB const*>(Super::m_that)->db()->lookupAux(h256(hashed.first));
+			return std::make_pair(h256(std::move(hashed.first)), std::make_pair(&m_key, std::move(hashed.second)));
+		}
+		
+		value_type operator*() const { return at(); }
+
+	private:
+		mutable bytes m_key;
+	};
+	
+	HashedIterator hashedBegin() const { return HashedIterator(this); }
+	HashedIterator hashedEnd() const { return HashedIterator(); }
 };
 
 template <class KeyType, class DB> using TrieDB = SpecificTrieDB<GenericTrieDB<DB>, KeyType>;
